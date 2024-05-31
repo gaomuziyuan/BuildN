@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useGists from "../hooks/useGists";
 import "./GistList.css";
 
@@ -8,31 +8,8 @@ const GistList = () => {
   );
   const [page, setPage] = useState(1);
   const { gists, isLoading } = useGists({ since, page });
-
-  const handleScroll = () => {
-    if (
-      window.innerHeight + document.documentElement.scrollTop + 1 <
-      document.documentElement.offsetHeight
-    ) {
-      console.log("window.innerHeight", window.innerHeight);
-      console.log(
-        "document.documentElement.scrollTop",
-        document.documentElement.scrollTop
-      );
-      console.log(
-        "document.documentElement.offsetHeight",
-        document.documentElement.offsetHeight
-      );
-      return;
-    }
-    console.log("window.innerHeight!!!", window.innerHeight);
-    setPage((prevPage) => prevPage + 1);
-  };
-
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const observerRef = useRef();
+  const [isFetching, setIsFetching] = useState(false);
 
   const handleClick = (avatarUrl) => {
     const img = document.createElement("img");
@@ -44,9 +21,29 @@ const GistList = () => {
     }, 1000);
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
+  useEffect(() => {
+    const currentObserverRef = observerRef.current;
+
+    const handleIntersect = (entries) => {
+      if (entries[0].isIntersecting && !isFetching) {
+        setPage((prevPage) => prevPage + 1);
+      }
+    };
+    const observer = new IntersectionObserver(handleIntersect, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 1.0,
+    });
+    if (currentObserverRef) {
+      observer.observe(currentObserverRef);
+    }
+
+    return () => {
+      if (currentObserverRef) {
+        observer.unobserve(currentObserverRef);
+      }
+    };
+  }, [isFetching]);
 
   return (
     <div className="gist-list">
@@ -65,6 +62,7 @@ const GistList = () => {
         </div>
       ))}
       {isLoading && <div>Loading...</div>}
+      <div ref={observerRef}></div>
     </div>
   );
 };
